@@ -25,6 +25,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.dashboard.security.user.core.UserInfo;
 import org.wso2.dashboard.security.user.core.common.AbstractUserStoreManager;
+import org.wso2.dashboard.security.user.core.common.Secret;
+import org.wso2.dashboard.security.user.core.common.UnsupportedSecretTypeException;
 import org.wso2.micro.integrator.security.user.api.ClaimManager;
 import org.wso2.micro.integrator.security.user.api.Permission;
 import org.wso2.micro.integrator.security.user.api.Properties;
@@ -44,6 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -165,12 +168,15 @@ public class FileBasedUserStoreManager extends AbstractUserStoreManager {
 
     @Override
     protected boolean doAuthenticate(String userName, Object credential) {
-
         UserInfo userInfo = userMap.get(userName);
-        if (userInfo != null) {
-            return new String(userInfo.getPassword()).equals(credential);
+        if (userInfo == null) {
+            return false;
         }
-        return false;
+        try (Secret secret = Secret.getSecret(credential)) {
+            return Arrays.equals(userInfo.getPassword(), secret.getChars());
+        } catch (UnsupportedSecretTypeException e) {
+            return false;
+        }
     }
 
     @Override
