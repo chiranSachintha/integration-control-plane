@@ -19,10 +19,10 @@ PRGDIR=`dirname "$PRG"`
 
 # Only set DASHBOARD_HOME if not already set
 [ -z "$DASHBOARD_HOME" ] && DASHBOARD_HOME=`cd "$PRGDIR/.." ; pwd`
-export DASHBOARD_HOME=$DASHBOARD_HOME
+export DASHBOARD_HOME="$DASHBOARD_HOME"
 for t in "$DASHBOARD_HOME"/lib/*.jar
 do
-    CARBON_CLASSPATH="$CARBON_CLASSPATH":$t
+    CARBON_CLASSPATH="$CARBON_CLASSPATH":"$t"
 done
 if [ -z "$JAVACMD" ] ; then
    if [ -n "$JAVA_HOME"  ] ; then
@@ -84,15 +84,15 @@ elif [ "$CMD" = "start" ]; then
     fi
   fi
 # using nohup bash to avoid errors in solaris OS
-  nohup bash $DASHBOARD_HOME/bin/dashboard.sh $args > /dev/null 2>&1 &
+  nohup bash "$DASHBOARD_HOME/bin/dashboard.sh" $args > /dev/null 2>&1 &
   exit 0
 elif [ "$CMD" = "stop" ]; then
-  kill -term `cat $DASHBOARD_HOME/runtime.pid`
+  kill -term `cat "$DASHBOARD_HOME/runtime.pid"`
   exit 0
 elif [ "$CMD" = "restart" ]; then
-  kill -term `cat $DASHBOARD_HOME/runtime.pid`
+  kill -term `cat "$DASHBOARD_HOME/runtime.pid"`
   process_status=0
-  pid=`cat $DASHBOARD_HOME/runtime.pid`
+  pid=`cat "$DASHBOARD_HOME/runtime.pid"`
   while [ "$process_status" -eq "0" ]
   do
         sleep 1;
@@ -100,10 +100,10 @@ elif [ "$CMD" = "restart" ]; then
         process_status=$?
   done
 # using nohup bash to avoid errors in solaris OS
-  nohup bash $DASHBOARD_HOME/bin/dashboard.sh $args > /dev/null 2>&1 &
+  nohup bash "$DASHBOARD_HOME/bin/dashboard.sh" $args > /dev/null 2>&1 &
   exit 0
 elif [ "$CMD" = "version" ]; then
-  cat $DASHBOARD_HOME/bin/version.txt
+  cat "$DASHBOARD_HOME/bin/version.txt"
   exit 0
 fi
 
