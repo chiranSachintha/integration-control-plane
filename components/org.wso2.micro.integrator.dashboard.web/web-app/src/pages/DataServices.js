@@ -28,7 +28,8 @@ export default function DataServices() {
         headCells: [
             {id: 'name', label: 'Data Service Name'},
             {id: 'nodes', label: 'Nodes'},
-            {id: 'wsdlUrl', label: 'WSDL 1.1'}],
+            {id: 'wsdlUrl', label: 'WSDL 1.1'},
+            {id: 'dsStatus', label: 'Status'}],
         tableOrderBy: 'name'
     });
 

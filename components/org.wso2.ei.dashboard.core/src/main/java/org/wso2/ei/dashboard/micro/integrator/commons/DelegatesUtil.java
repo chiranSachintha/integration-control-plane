@@ -83,6 +83,10 @@ public class DelegatesUtil {
                 boolean isSIArtifact = isSIArtifact(artifactType);
                 if (artifactType.equals(Constants.CARBON_APPLICATIONS)) {
                     artifactDetails = getArtifactDetails(nodeId, artifact);
+                } else if (artifactType.equals(Constants.DATA_SERVICES)
+                        && artifact.has("status")
+                        && "faulty".equals(artifact.get("status").getAsString())) {
+                    artifactDetails = getArtifactDetails(nodeId, artifact);
                 } else if (isSIArtifact) {
                     artifactDetails = new ArtifactDetails();
                     artifactDetails.setNodeId(nodeId);
@@ -218,6 +222,21 @@ public class DelegatesUtil {
                 allCApps.add(app);
             }
             return allCApps;
+        } else if (type.equals(Constants.DATA_SERVICES)) {
+            JsonArray activeArray = artifacts.get("list").getAsJsonArray();
+            JsonArray allDS = new JsonArray();
+            for (JsonElement ds : activeArray) {
+                ds.getAsJsonObject().addProperty("status", "active");
+                allDS.add(ds);
+            }
+            if (artifacts.has("faultyList") && !artifacts.get("faultyList").isJsonNull()) {
+                JsonArray faultyArray = artifacts.get("faultyList").getAsJsonArray();
+                for (JsonElement ds : faultyArray) {
+                    ds.getAsJsonObject().addProperty("status", "faulty");
+                    allDS.add(ds);
+                }
+            }
+            return allDS;
         } else {
             return artifacts.get("list").getAsJsonArray();
         }

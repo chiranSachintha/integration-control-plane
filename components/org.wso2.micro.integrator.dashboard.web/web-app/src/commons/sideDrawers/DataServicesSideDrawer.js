@@ -19,6 +19,7 @@
  */
 
 import React from 'react';
+import { useSelector } from 'react-redux';
 import { makeStyles } from '@material-ui/core/styles';
 import Paper from '@material-ui/core/Paper';
 import Grid from '@material-ui/core/Grid';
@@ -27,16 +28,44 @@ import { Table, TableCell, TableRow, TableBody } from '@material-ui/core';
 import HeadingSection from './commons/HeadingSection'
 import SourceViewSection from './commons/SourceViewSection'
 import Typography from '@material-ui/core/Typography';
+import CircularProgress from '@material-ui/core/CircularProgress';
+import EnabledIcon from '@material-ui/icons/CheckCircleOutlineOutlined';
+import DisabledIcon from '@material-ui/icons/BlockOutlined';
 import ExpansionPanel from '@material-ui/core/ExpansionPanel';
 import ExpansionPanelSummary from '@material-ui/core/ExpansionPanelSummary';
 import ExpansionPanelDetails from '@material-ui/core/ExpansionPanelDetails';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import HTTPClient from '../../utils/HTTPClient';
 
 export default function DataServicesSideDrawer(props) {
+    const globalGroupId = useSelector(state => state.groupId);
     var nodeData = props.nodeData;
-    const artifactName = nodeData.details.serviceName;
+    const isFaulty = nodeData.details.status === 'faulty';
+    const artifactName = nodeData.details.serviceName || nodeData.details.name;
     const nodeId = nodeData.nodeId;
     const classes = useStyles();
+
+    if (isFaulty) {
+        return (
+            <div className={classes.root}>
+                <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                        <HeadingSection name={artifactName} nodeId={nodeId} />
+                        <Paper className={classes.paper} elevation={0} square>
+                            <FaultyDataServiceDetailTable nodeData={nodeData.details} />
+                        </Paper>
+                        <Box pl={2} pr={2} pt={1}>
+                            <StackTraceSection
+                                groupId={globalGroupId}
+                                nodeId={nodeId}
+                                serviceName={artifactName}
+                            />
+                        </Box>
+                    </Grid>
+                </Grid>
+            </div>
+        );
+    }
 
     return (
         <div className={classes.root}>
@@ -65,6 +94,79 @@ export default function DataServicesSideDrawer(props) {
     );
 }
 
+function FaultyDataServiceDetailTable(props) {
+    const nodeData = props.nodeData;
+    return <Table>
+        <TableBody>
+            <TableRow>
+                <TableCell>Data Service Name</TableCell>
+                <TableCell>{nodeData.name}</TableCell>
+            </TableRow>
+            <TableRow>
+                <TableCell>Status</TableCell>
+                <TableCell>
+                    <span style={{display:'flex', alignItems:'center', gap:4, color:'red'}}>
+                        <DisabledIcon fontSize="small"/> FAULTY
+                    </span>
+                </TableCell>
+            </TableRow>
+            {nodeData.errorMessage && (
+                <TableRow>
+                    <TableCell>Error Message</TableCell>
+                    <TableCell style={{color: 'red'}}>{nodeData.errorMessage}</TableCell>
+                </TableRow>
+            )}
+        </TableBody>
+    </Table>
+}
+
+function StackTraceSection({ groupId, nodeId, serviceName }) {
+    const [expanded, setExpanded] = React.useState(false);
+    const [stackTrace, setStackTrace] = React.useState(null);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState(null);
+    const [hasFetched, setHasFetched] = React.useState(false);
+
+    const handleChange = (event, isExpanded) => {
+        if (isExpanded && !hasFetched && !loading) {
+            setLoading(true);
+            setError(null);
+            HTTPClient.getDataServiceFaultDetails(groupId, nodeId, serviceName)
+                .then(res => {
+                    setStackTrace(res.data.faultStackTrace || null);
+                    setHasFetched(true);
+                    setLoading(false);
+                })
+                .catch(() => {
+                    setError('Failed to load stack trace.');
+                    setHasFetched(true);
+                    setLoading(false);
+                });
+        }
+        setExpanded(isExpanded);
+    };
+
+    return (
+        <ExpansionPanel expanded={expanded} onChange={handleChange}>
+            <ExpansionPanelSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>Stack Trace</Typography>
+            </ExpansionPanelSummary>
+            <ExpansionPanelDetails>
+                {loading && <CircularProgress size={20} />}
+                {error && <Typography color="error">{error}</Typography>}
+                {!loading && !error && stackTrace && (
+                    <pre style={{ overflowX: 'auto', maxHeight: 300, fontSize: 12, width: '100%', whiteSpace: 'pre' }}>
+                        {stackTrace}
+                    </pre>
+                )}
+                {!loading && !error && !stackTrace && (
+                    <Typography variant="body2" color="textSecondary">No stack trace available.</Typography>
+                )}
+            </ExpansionPanelDetails>
+        </ExpansionPanel>
+    );
+}
+
 function DataServicesDetailTable(props) {
     const nodeData = props.nodeData;
     const wsdl1_1 = nodeData.wsdl1_1;
@@ -75,6 +177,14 @@ function DataServicesDetailTable(props) {
             <TableRow>
                 <TableCell>Data Service Name</TableCell>
                 <TableCell>{nodeData.serviceName}</TableCell>
+            </TableRow>
+            <TableRow>
+                <TableCell>Status</TableCell>
+                <TableCell>
+                    <span style={{display:'flex', alignItems:'center', gap:4, color:'green'}}>
+                        <EnabledIcon fontSize="small"/> ACTIVE
+                    </span>
+                </TableCell>
             </TableRow>
             <TableRow>
                 <TableCell>WSDL 1.1</TableCell>

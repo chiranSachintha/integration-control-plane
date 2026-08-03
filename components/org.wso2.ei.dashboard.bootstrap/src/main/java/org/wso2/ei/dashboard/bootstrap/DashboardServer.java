@@ -83,6 +83,7 @@ public class DashboardServer {
     private static final String SECURITY_DIR = "security";
     private static final String TOML_CONF_PORT = "server_config.port";
     private static final String TOML_CONF_PROTOCOL = "server_config.protocol";
+    private static final String TOML_CONF_HOSTNAME = "server_config.hostname";
     private static final String TOML_MI_USERNAME = "mi_super_admin.username";
     private static final String TOML_MI_PASSWORD = "mi_super_admin.password";
     private static final String MI_USERNAME = "mi_username";
@@ -134,12 +135,14 @@ public class DashboardServer {
     public void startServerWithConfigs() {
         int serverPort = 9743;
         String serverProtocol = HTTPS_PROTOCOL;
+        String serverHostName = null;
         String tomlFilePath = DASHBOARD_HOME + File.separator + CONF_DIR + File.separator + DEPLOYMENT_TOML;
 
         try {
             Map<String, Object> parsedConfigs = parseConfigJS(tomlFilePath);
             serverPort = getServerPort(parsedConfigs, serverPort);
             serverProtocol = getServerProtocol(parsedConfigs);
+            serverHostName = getServerHostName(parsedConfigs);
 
             initSecureVault(parsedConfigs);
             loadConfigurations(parsedConfigs);
@@ -156,7 +159,7 @@ public class DashboardServer {
         Server server = new Server();
         configureServer(server, serverPort, serverProtocol);
         try {
-            startAndMonitorServer(server, serverPort, serverProtocol);
+            startAndMonitorServer(server, serverPort, serverProtocol, serverHostName);
         } catch (Exception ex) {
             logger.error("Error while starting up the server", ex);
         }
@@ -169,6 +172,17 @@ public class DashboardServer {
             return ((Long) serverPortConfig).intValue();
         }
         return defaultPort;
+    }
+
+    private String getServerHostName(Map<String, Object> parsedConfigs) {
+        Object serverHostNameConfig = parsedConfigs.get(TOML_CONF_HOSTNAME);
+        if (serverHostNameConfig instanceof String) {
+            String hostName = ((String) serverHostNameConfig).trim();
+            if (!hostName.isEmpty()) {
+                return hostName;
+            }
+        }
+        return null;
     }
 
     private String getServerProtocol(Map<String, Object> parsedConfigs) throws ConfigParserException {
@@ -195,10 +209,11 @@ public class DashboardServer {
         addShutdownHook();
     }
 
-    private void startAndMonitorServer(Server server, int serverPort, String serverProtocol) throws Exception {
+    private void startAndMonitorServer(Server server, int serverPort, String serverProtocol, String serverHostName)
+            throws Exception {
         server.start();
         writePID(DASHBOARD_HOME);
-        printServerStartupLog(serverPort, serverProtocol);
+        printServerStartupLog(serverPort, serverProtocol, serverHostName);
         server.join();
     }
 
@@ -283,14 +298,16 @@ public class DashboardServer {
         server.setHandler(handlers);
     }
 
-    private void printServerStartupLog(int serverPort, String serverProtocol) {
+    private void printServerStartupLog(int serverPort, String serverProtocol, String serverHostName) {
         InetAddress localHost;
-        String hostName;
-        try {
-            localHost = InetAddress.getLocalHost();
-            hostName = localHost.getHostName();
-        } catch (UnknownHostException e) {
-            hostName = "127.0.0.1";
+        String hostName = serverHostName;
+        if (hostName == null) {
+            try {
+                localHost = InetAddress.getLocalHost();
+                hostName = localHost.getHostName();
+            } catch (UnknownHostException e) {
+                hostName = "127.0.0.1";
+            }
         }
         String loginUrl = serverProtocol + "://" + hostName + ":" + serverPort + "/login";
         logger.info("WSO2 Integration Control Plane started.");

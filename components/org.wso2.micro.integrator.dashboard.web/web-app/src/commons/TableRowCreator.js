@@ -72,7 +72,12 @@ export default function TableRowCreator(props) {
 
             // Proxy Services and dataservices
             case 'wsdlUrl':
-                return <TableCell><table>{data.nodes.map(node=><LinkCell data={node.details.wsdl1_1} />)}</table></TableCell>
+                return <TableCell><table>{data.nodes.map(node => node.details.wsdl1_1
+                    ? <LinkCell key={node.nodeId} data={node.details.wsdl1_1} />
+                    : <tr key={node.nodeId}><td>—</td></tr>
+                )}</table></TableCell>
+            case 'dsStatus':
+                return <TableCell><table>{data.nodes.map(node=><StatusIcon key={node.nodeId} status={node.details.status === 'faulty' ? 'disabled' : 'enabled'} />)}</table></TableCell>
 
             // Proxy Services
             case 'isRunning':
