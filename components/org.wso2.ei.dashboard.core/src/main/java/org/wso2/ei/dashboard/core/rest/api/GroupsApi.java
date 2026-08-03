@@ -43,6 +43,7 @@ import org.wso2.ei.dashboard.core.rest.model.AddUserRequest;
 import org.wso2.ei.dashboard.core.rest.model.ArtifactUpdateRequest;
 import org.wso2.ei.dashboard.core.rest.model.ArtifactsResourceResponse;
 import org.wso2.ei.dashboard.core.rest.model.CAppArtifacts;
+import org.wso2.ei.dashboard.core.rest.model.DataServiceFaultDetails;
 import org.wso2.ei.dashboard.core.rest.model.DatasourceList;
 import org.wso2.ei.dashboard.core.rest.model.Error;
 import org.wso2.ei.dashboard.core.rest.model.GroupList;
@@ -427,6 +428,32 @@ public class GroupsApi {
         CarbonAppsDelegate cappsDelegate = new CarbonAppsDelegate();
         CAppArtifacts cAppArtifactList = cappsDelegate.getCAppArtifactList(groupId, nodeId, cappName);
         ResponseBuilder responseBuilder = Response.ok().entity(cAppArtifactList);
+        HttpUtils.setHeaders(responseBuilder);
+        return responseBuilder.build();
+    }
+
+    @GET
+    @Path("/{group-id}/nodes/{node-id}/data-services/{service-name}/faultDetails")
+    @Produces({"application/json"})
+    @Operation(summary = "Get fault details of a faulty data service by node id", description = "",
+            tags = {"data-services"})
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200",
+                    description = "Fault details of the faulty data service",
+                    content = @Content(schema = @Schema(implementation = DataServiceFaultDetails.class))),
+            @ApiResponse(responseCode = "404", description = "Data service not found or not faulty",
+                    content = @Content(schema = @Schema(implementation = Error.class))),
+            @ApiResponse(responseCode = "500", description = "Unexpected error",
+                    content = @Content(schema = @Schema(implementation = Error.class)))
+    })
+    public Response getDataServiceFaultDetails(
+            @PathParam("group-id") @Parameter(description = "Group ID of the node") String groupId,
+            @PathParam("node-id") @Parameter(description = "Node ID") String nodeId,
+            @PathParam("service-name") @Parameter(description = "Data service name") String serviceName)
+            throws ManagementApiException {
+        DataServicesDelegate dataServicesDelegate = new DataServicesDelegate();
+        DataServiceFaultDetails faultDetails = dataServicesDelegate.getDataServiceFaultDetails(groupId, nodeId, serviceName);
+        ResponseBuilder responseBuilder = Response.ok().entity(faultDetails);
         HttpUtils.setHeaders(responseBuilder);
         return responseBuilder.build();
     }

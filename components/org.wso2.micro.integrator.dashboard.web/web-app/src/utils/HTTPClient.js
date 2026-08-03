@@ -274,6 +274,11 @@ export default class HTTPClient {
         return this.getResource(resourcePath)
     }
 
+    static getDataServiceFaultDetails(groupId, nodeId, serviceName) {
+        const resourcePath = `${groupId}/${Constants.PREFIX_NODES}/${nodeId}/data-services/${encodeURIComponent(serviceName)}/faultDetails`
+        return this.getResource(resourcePath)
+    }
+
     static updateArtifact(groupId, pageId, payload) {
         const path = `/${Constants.PREFIX_GROUPS}/${groupId}/${pageId}`
         return this.patch(path, payload)
