@@ -33,7 +33,6 @@ import org.wso2.ei.dashboard.core.commons.audit.AuditLogger;
 import org.wso2.ei.dashboard.core.commons.Constants;
 import org.wso2.ei.dashboard.core.commons.utils.HttpUtils;
 import org.wso2.ei.dashboard.core.exception.ManagementApiException;
-import org.wso2.ei.dashboard.core.rest.annotation.Secured;
 import org.wso2.ei.dashboard.core.rest.delegates.groups.GroupDelegate;
 import org.wso2.ei.dashboard.core.rest.delegates.nodes.NodesDelegate;
 
@@ -111,7 +110,6 @@ import javax.ws.rs.core.Response.ResponseBuilder;
 import java.io.File;
 import java.util.List;
 
-@Secured
 @Path("/groups")
 
 @javax.annotation.Generated(value = "io.swagger.codegen.v3.generators.java.JavaJAXRSSpecServerCodegen", date = "2020-12-15T14:16:00.637+05:30[Asia/Colombo]")

@@ -22,7 +22,6 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import org.glassfish.jersey.server.ContainerRequest;
 import org.wso2.ei.dashboard.core.commons.audit.AuditLogger;
-import org.wso2.ei.dashboard.core.rest.annotation.Secured;
 import org.wso2.micro.integrator.dashboard.utils.SSOConfig;
 import org.wso2.micro.integrator.dashboard.utils.SSOConstants;
 
@@ -50,13 +49,24 @@ import static org.wso2.ei.dashboard.core.commons.auth.JwtUtil.isJWTToken;
 
 /**
  * Authenticate the request coming to the rest api.
+ * <p>
+ * This filter is registered globally, so every resource served by the dashboard rest api is authenticated
+ * unless its root resource is listed in {@link #UNAUTHENTICATED_PATHS}. A newly added resource is therefore
+ * authenticated by default, and exposing one anonymously is a deliberate change to that list rather than an
+ * omission at the resource class.
  */
-@Secured
 @Provider
 @Priority(Priorities.AUTHENTICATION)
 public class AuthenticationFilter implements ContainerRequestFilter {
     private static final String AUTHENTICATION_SCHEME = "Bearer";
     private static final List<String> ADMIN_ONLY_PATHS = Arrays.asList("/log-configs", "/users", "/roles");
+    // Root resources reachable without a dashboard session. Anything not listed here requires authentication.
+    //   login     - credential submission and the CSRF token used to submit it
+    //   logout    - session teardown, which cannot require the session it is tearing down
+    //   heartbeat - the endpoint managed MI nodes call to register themselves with the dashboard
+    //   healthz   - liveness probe, consumed by deployment tooling that holds no dashboard session
+    private static final List<String> UNAUTHENTICATED_PATHS =
+            Arrays.asList("login", "logout", "heartbeat", "healthz");
     private static final String MAKE_NON_ADMIN_USERS_READ_ONLY = "make_non_admin_users_read_only";
     private static final String ACTION_PERFORMED_BY = "performedBy";
     // Tracks SSO Bearer tokens that have already produced a login audit entry.
@@ -70,6 +80,9 @@ public class AuthenticationFilter implements ContainerRequestFilter {
 
     @Override
     public void filter(ContainerRequestContext requestContext) {
+        if (isUnauthenticatedResource(requestContext)) {
+            return;
+        }
         String httpMethod = requestContext.getMethod();
         String token = extractToken(requestContext);
         SecurityHandler securityHandler = getSecurityHandler(requestContext, token);
@@ -121,9 +134,31 @@ public class AuthenticationFilter implements ContainerRequestFilter {
         return config instanceof SSOConfig ? (SSOConfig) config : null;
     }
 
+    private static boolean isUnauthenticatedResource(ContainerRequestContext requestContext) {
+        String rootResource = getRootResource(requestContext);
+        return UNAUTHENTICATED_PATHS.contains(rootResource);
+    }
+
+    /**
+     * Returns the first segment of the request path, which identifies the root resource being addressed.
+     * <p>
+     * Matched on the whole segment rather than as a prefix, so that a resource whose name merely starts with
+     * an unauthenticated one (for example a future "login-attempts" alongside "login") is not exempted by
+     * accident.
+     */
+    private static String getRootResource(ContainerRequestContext requestContext) {
+        // Relative to the rest api base path and carries no leading slash, e.g. "groups/g1/apis" or "healthz".
+        String path = ((ContainerRequest) requestContext).getPath(false);
+        int separator = path.indexOf('/');
+        return separator < 0 ? path : path.substring(0, separator);
+    }
+
     private static boolean isAdminResource(ContainerRequestContext requestContext) {
         String path = ((ContainerRequest) requestContext).getPath(false);
-        String resource = path.substring(path.lastIndexOf("/"));
+        int lastSeparator = path.lastIndexOf("/");
+        // A single segment path carries no separator to split on, so qualify it to match how ADMIN_ONLY_PATHS
+        // is written. Without this the substring below is called with -1 on such paths.
+        String resource = lastSeparator < 0 ? "/" + path : path.substring(lastSeparator);
         return ADMIN_ONLY_PATHS.contains(resource);
     }
 
