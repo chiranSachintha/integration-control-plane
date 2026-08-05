@@ -30,6 +30,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.dashboard.security.user.core.common.DashboardUserStoreException;
 import org.wso2.ei.dashboard.core.commons.audit.AuditLogger;
+import org.wso2.ei.dashboard.core.commons.auth.AuthorizationUtils;
 import org.wso2.ei.dashboard.core.commons.Constants;
 import org.wso2.ei.dashboard.core.commons.utils.HttpUtils;
 import org.wso2.ei.dashboard.core.exception.ManagementApiException;
@@ -297,6 +298,7 @@ public class GroupsApi {
             @PathParam("user-id") @Parameter(description = "User ID") String userId,
             @QueryParam("domain") @Parameter(description = "domain name") String domain,
             @Context ContainerRequestContext requestContext) {
+        AuthorizationUtils.requireAdmin(requestContext, "Delete User");
         String performedBy = (String) requestContext.getProperty("performedBy");
         try {
             Ack ack = UsersDelegate.getDelegate(groupId).deleteUser(userId, domain, performedBy);
@@ -1064,6 +1066,7 @@ public class GroupsApi {
             @PathParam("node-id") @Parameter(description = "NodeId") String nodeId,
             @Valid LogConfigUpdateRequest request,
             @Context ContainerRequestContext requestContext) throws ManagementApiException {
+        AuthorizationUtils.requireAdmin(requestContext, "Update Log Config");
         LogConfigDelegate logConfigDelegate = new LogConfigDelegate();
         Ack ack = logConfigDelegate.updateLogLevelByNodeId(groupId, nodeId, request);
         if (Constants.SUCCESS_STATUS.equals(ack.getStatus())) {
@@ -1543,6 +1546,7 @@ public class GroupsApi {
             @PathParam("role-name") @Parameter(description = "Role Name") String roleName,
             @QueryParam("domain") @Parameter(description = "domain name") String domain,
             @Context ContainerRequestContext requestContext) {
+        AuthorizationUtils.requireAdmin(requestContext, "Delete Role");
         try {
             Ack ack = RolesDelegate.getDelegate(groupId).deleteRole(roleName, domain);
             String performedBy = (String) requestContext.getProperty("performedBy");

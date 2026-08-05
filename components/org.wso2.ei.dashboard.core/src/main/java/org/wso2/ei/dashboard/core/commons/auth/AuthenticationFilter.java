@@ -27,8 +27,10 @@ import org.wso2.micro.integrator.dashboard.utils.SSOConstants;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.wso2.ei.dashboard.core.commons.Constants.TOKEN_CACHE_TIMEOUT;
@@ -41,6 +43,7 @@ import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.PathSegment;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 
@@ -59,7 +62,11 @@ import static org.wso2.ei.dashboard.core.commons.auth.JwtUtil.isJWTToken;
 @Priority(Priorities.AUTHENTICATION)
 public class AuthenticationFilter implements ContainerRequestFilter {
     private static final String AUTHENTICATION_SCHEME = "Bearer";
-    private static final List<String> ADMIN_ONLY_PATHS = Arrays.asList("/log-configs", "/users", "/roles");
+    // Resource types under /groups/{group-id}/ that only an admin may reach, in any form: the
+    // collection itself and every sub-path below it.
+    private static final Set<String> ADMIN_ONLY_RESOURCES = new HashSet<>(
+            Arrays.asList("log-configs", "users", "roles", "all-roles"));
+    private static final String GROUPS_RESOURCE = "groups";
     // Root resources reachable without a dashboard session. Anything not listed here requires authentication.
     //   login     - credential submission and the CSRF token used to submit it
     //   logout    - session teardown, which cannot require the session it is tearing down
@@ -68,7 +75,8 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     private static final List<String> UNAUTHENTICATED_PATHS =
             Arrays.asList("login", "logout", "heartbeat", "healthz");
     private static final String MAKE_NON_ADMIN_USERS_READ_ONLY = "make_non_admin_users_read_only";
-    private static final String ACTION_PERFORMED_BY = "performedBy";
+    private static final String ADMIN_ONLY_DENIAL = "Admin only resource";
+    private static final String READ_ONLY_DENIAL = "Read only mode is enabled for non-admin users";
     // Tracks SSO Bearer tokens that have already produced a login audit entry.
     // expireAfterAccess: an active session keeps the entry alive; eviction only happens on inactivity,
     // so a long-lived token does not generate repeated Login entries while it is in continuous use.
@@ -105,21 +113,36 @@ public class AuthenticationFilter implements ContainerRequestFilter {
             return;
         }
 
-        boolean makeNonAdminUsersReadOnly = Boolean.parseBoolean(System.getProperty(MAKE_NON_ADMIN_USERS_READ_ONLY));
-        if (isAdminResource(requestContext) && !securityHandler.isAuthorized(config, token)) {
-            // The user is authenticated but not permitted to access this resource.
-            abortWithForbidden(requestContext);
-            return;
-        }
-        if (!"GET".equalsIgnoreCase(httpMethod) && makeNonAdminUsersReadOnly
-                && !securityHandler.isAuthorized(config, token)) {
-            // For non-admin resources, request except GET are blocked
-            // if the 'makeNonAdminUsersReadOnly' is set to 'true'
-            abortWithForbidden(requestContext);
-            return;
-        }
+        // Resolved before the authorization checks so a denial can be attributed to a user in the
+        // audit log. Every SecurityHandler reads the subject from the token itself or from a cache
+        // populated during authentication, so this costs no additional remote call.
         String performedBy = securityHandler.getSubject(config, token);
-        requestContext.setProperty(ACTION_PERFORMED_BY, performedBy);
+        requestContext.setProperty(AuthorizationUtils.ACTION_PERFORMED_BY, performedBy);
+
+        // Evaluated lazily and at most once: for opaque SSO tokens isAuthorized() calls the
+        // userInfo endpoint whenever the caller is not a cached admin, so it must stay off the
+        // path of requests that do not need it.
+        Boolean isAdmin = null;
+        if (isAdminResource(requestContext)) {
+            isAdmin = resolveIsAdmin(requestContext, securityHandler, config, token);
+            if (!isAdmin) {
+                // The user is authenticated but not permitted to access this resource.
+                abortWithForbidden(requestContext, performedBy, ADMIN_ONLY_DENIAL);
+                return;
+            }
+        }
+        boolean makeNonAdminUsersReadOnly = Boolean.parseBoolean(System.getProperty(MAKE_NON_ADMIN_USERS_READ_ONLY));
+        if (!"GET".equalsIgnoreCase(httpMethod) && makeNonAdminUsersReadOnly) {
+            if (isAdmin == null) {
+                isAdmin = resolveIsAdmin(requestContext, securityHandler, config, token);
+            }
+            if (!isAdmin) {
+                // For non-admin resources, request except GET are blocked
+                // if the 'makeNonAdminUsersReadOnly' is set to 'true'
+                abortWithForbidden(requestContext, performedBy, READ_ONLY_DENIAL);
+                return;
+            }
+        }
 
         // Log SSO logins on first use of each Bearer token (cookie-based = local login, already audited in LoginDelegate)
         if (isTokenBasedAuthentication(requestContext.getHeaderString(HttpHeaders.AUTHORIZATION))
@@ -153,20 +176,41 @@ public class AuthenticationFilter implements ContainerRequestFilter {
         return separator < 0 ? path : path.substring(0, separator);
     }
 
+    /**
+     * Resolves whether the caller is an admin and records the verdict on the request, so that
+     * resource methods can assert on it without recomputing it.
+     */
+    private static boolean resolveIsAdmin(ContainerRequestContext requestContext, SecurityHandler securityHandler,
+                                          SSOConfig config, String token) {
+        boolean isAdmin = securityHandler.isAuthorized(config, token);
+        requestContext.setProperty(AuthorizationUtils.CALLER_IS_ADMIN, isAdmin);
+        return isAdmin;
+    }
+
+    /**
+     * Decides whether a request targets an admin-only resource.
+     *
+     * The resource type is the segment following the group id in
+     * {@code groups/{group-id}/<resource-type>/...}, so sub-paths such as
+     * {@code users/{user-id}} are covered along with the collection itself. Matching the last
+     * segment instead would leave every sub-path of an admin-only resource unprotected.
+     * Segments are compared decoded, so percent-encoded spellings cannot slip past.
+     */
     private static boolean isAdminResource(ContainerRequestContext requestContext) {
-        String path = ((ContainerRequest) requestContext).getPath(false);
-        int lastSeparator = path.lastIndexOf("/");
-        // A single segment path carries no separator to split on, so qualify it to match how ADMIN_ONLY_PATHS
-        // is written. Without this the substring below is called with -1 on such paths.
-        String resource = lastSeparator < 0 ? "/" + path : path.substring(lastSeparator);
-        return ADMIN_ONLY_PATHS.contains(resource);
+        List<PathSegment> segments = requestContext.getUriInfo().getPathSegments();
+        if (segments.size() < 3 || !GROUPS_RESOURCE.equals(segments.get(0).getPath())) {
+            return false;
+        }
+        return ADMIN_ONLY_RESOURCES.contains(segments.get(2).getPath());
     }
 
     private void abortWithUnauthorized(ContainerRequestContext requestContext) {
         abortWith(requestContext, Response.Status.UNAUTHORIZED, "Unauthorized");
     }
 
-    private void abortWithForbidden(ContainerRequestContext requestContext) {
+    private void abortWithForbidden(ContainerRequestContext requestContext, String performedBy, String reason) {
+        AuditLogger.logAccessDenied(performedBy, requestContext.getMethod(),
+                requestContext.getUriInfo().getPath(), reason);
         abortWith(requestContext, Response.Status.FORBIDDEN, "Forbidden");
     }
 

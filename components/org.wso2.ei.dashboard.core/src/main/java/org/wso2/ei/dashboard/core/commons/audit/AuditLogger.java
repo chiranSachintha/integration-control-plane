@@ -35,6 +35,9 @@ public final class AuditLogger {
     private static final String NA = "N/A";
     private static final String SUCCESS = "Success";
     private static final String FAILURE = "Failure";
+    private static final int MAX_FIELD_LENGTH = 256;
+    private static final int MAX_DATA_LENGTH = 2048;
+    private static final String TRUNCATION_SUFFIX = "...";
 
     private AuditLogger() {}
 
@@ -52,6 +55,24 @@ public final class AuditLogger {
         write(actor(username), "Logout", NA,
                 "\"username\" : \"" + actor(username) + "\"",
                 SUCCESS);
+    }
+
+    // -------------------------------------------------------------------------
+    // Authorization
+    // -------------------------------------------------------------------------
+
+    /**
+     * Records an authenticated user being refused access to a resource. Invalid or expired
+     * sessions (401) are deliberately not recorded here: they are routine on session expiry and
+     * would drown the genuine denials, and failed logins are already covered by
+     * {@link #logLogin(String, boolean)}.
+     */
+    public static void logAccessDenied(String performedBy, String method, String resource, String reason) {
+        write(actor(performedBy), "Access Denied", resource,
+                "\"method\" : \"" + method + "\""
+                        + ", \"resource\" : \"" + resource + "\""
+                        + ", \"reason\" : \"" + reason + "\"",
+                FAILURE);
     }
 
     // -------------------------------------------------------------------------
@@ -142,11 +163,31 @@ public final class AuditLogger {
     // -------------------------------------------------------------------------
 
     private static void write(String initiator, String action, String target, String data, String result) {
-        AUDIT_LOG.info("Initiator : " + initiator
-                + " | Action : " + action
-                + " | Target : " + target
-                + " | Data : { " + data + " }"
+        AUDIT_LOG.info("Initiator : " + clean(initiator, MAX_FIELD_LENGTH)
+                + " | Action : " + clean(action, MAX_FIELD_LENGTH)
+                + " | Target : " + clean(target, MAX_FIELD_LENGTH)
+                + " | Data : { " + clean(data, MAX_DATA_LENGTH) + " }"
                 + " | Result : " + result);
+    }
+
+    /**
+     * Keeps a single event on a single line. Values such as a denied request path are supplied by
+     * the caller of the REST API, so a raw line break would let one request forge additional audit
+     * entries. Over-long values are truncated to bound the damage of a padded field, with the
+     * ellipsis counted inside the limit so the emitted value never exceeds it.
+     */
+    private static String clean(String value, int maxLength) {
+        if (value == null) {
+            return NA;
+        }
+        String sanitized = value.replaceAll("[\\r\\n]", " ");
+        if (sanitized.length() <= maxLength) {
+            return sanitized;
+        }
+        // max() keeps the length non-negative: this runs while writing an audit entry, where an
+        // exception would both lose the record and surface as a 500 to the caller.
+        int keep = Math.max(0, maxLength - TRUNCATION_SUFFIX.length());
+        return sanitized.substring(0, keep) + TRUNCATION_SUFFIX;
     }
 
     private static String actor(String performedBy) {
