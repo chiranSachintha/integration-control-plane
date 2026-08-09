@@ -64,6 +64,8 @@ make_non_admin_users_read_only = false
 ##introspection_endpoint = "https://<IS-host>:<port>/oauth2/introspect"
 ##user_info_endpoint = "https://<IS-host>:<port>/oauth2/userinfo"
 #jwt_issuer = "https://<IS-host>:<port>/oauth2/token"
+## Request the claims required for displaying the username and evaluating group access.
+#scope = ["openid", "profile", "groups"]
 #admin_group_attribute = "groups"
 #admin_groups = ["admin"]
 ## ID token claim used for the UI header username chip and audit log Initiator.
