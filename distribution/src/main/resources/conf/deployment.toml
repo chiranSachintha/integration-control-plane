@@ -37,6 +37,12 @@ password = "wso2carbon"
 [user_access]
 make_non_admin_users_read_only = false
 
+# Restrict dashboard login to users with at least one of these roles. When SSO is
+# enabled, values are matched against the claim configured by
+# sso.admin_group_attribute. Leave empty to allow all authenticated users.
+#[console_access]
+#allowed_roles = "ICP-Admins,ICP-Viewers"
+
 # SSO configuration (disabled by default; remove the leading '#' to enable).
 # Audit logging records the initiating username from the access token.  For the
 # username to appear correctly (rather than an internal UUID) the IdP MUST include

@@ -106,6 +106,12 @@ public class AuthenticationFilter implements ContainerRequestFilter {
                 abortWithUnauthorized(requestContext);
                 return;
             }
+            if (isTokenBasedAuthentication(requestContext.getHeaderString(HttpHeaders.AUTHORIZATION))
+                    && !securityHandler.isLoginAllowed(config, token)) {
+                // Authentication succeeded, but the user has no role configured for console access.
+                abortWithForbidden(requestContext);
+                return;
+            }
         } catch (TokenValidationException e) {
             // The token could not be validated because of a server/IdP side failure (e.g. the JWKS or introspection
             // endpoint is unreachable or untrusted). The session may well be valid, so do not report it as a 401.
