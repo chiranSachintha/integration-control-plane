@@ -54,10 +54,14 @@ public class NodeRegistrationChallengeManager {
     private static final Logger logger = LogManager.getLogger(NodeRegistrationChallengeManager.class);
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    // groupId/nodeId are unauthenticated and attacker-controlled, so without a cap a flood of distinct pairs
+    // could grow this cache unboundedly for up to the full expiry window; this caps memory use under load.
+    private static final long MAX_PENDING_CHALLENGES = 10_000L;
 
     // Keyed by groupId/nodeId, single-use, and short-lived: a challenge is only ever meant to be answered by
     // the very next request in the same registration handshake.
     private static final Cache<String, String> PENDING_CHALLENGES = CacheBuilder.newBuilder()
+            .maximumSize(MAX_PENDING_CHALLENGES)
             .expireAfterWrite(Constants.NODE_CHALLENGE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .build();
 

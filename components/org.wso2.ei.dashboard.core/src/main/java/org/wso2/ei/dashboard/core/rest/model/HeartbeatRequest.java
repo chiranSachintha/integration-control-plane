@@ -125,8 +125,9 @@ public class HeartbeatRequest   {
   }
 
   /**
-   * HMAC-SHA256(challenge, mi_super_admin password), base64-encoded. Absent on the first heartbeat for a new
-   * node; present on the follow-up heartbeat that answers the challenge ICP returned for that first attempt.
+   * HMAC-SHA256 over the challenge together with groupId, nodeId and mgtApiUrl, keyed with the mi_super_admin
+   * password, base64-encoded. Absent on the first heartbeat for a new node; present on the follow-up heartbeat
+   * that answers the challenge ICP returned for that first attempt.
    **/
   public HeartbeatRequest signedChallenge(String signedChallenge) {
     this.signedChallenge = signedChallenge;
