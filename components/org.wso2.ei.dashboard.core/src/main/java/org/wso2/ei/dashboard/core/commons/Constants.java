@@ -60,6 +60,11 @@ public final class Constants {
 
     public static final String SUCCESS_STATUS = "success";
     public static final String FAIL_STATUS = "fail";
+    // Returned in place of a SUCCESS/FAIL Ack when a node registers for the first time: the caller must sign the
+    // returned challenge with the shared mi_super_admin password and resend the heartbeat before ICP will forward
+    // that password to the caller-supplied mgtApiUrl.
+    public static final String CHALLENGE_STATUS = "challenge";
+    public static final int NODE_CHALLENGE_TIMEOUT_SECONDS = 60;
 
     public static final String UTF_8_ENCODING = "UTF-8";
 
