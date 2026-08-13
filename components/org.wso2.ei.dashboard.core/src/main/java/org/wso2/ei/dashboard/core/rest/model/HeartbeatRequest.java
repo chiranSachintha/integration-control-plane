@@ -32,6 +32,7 @@ public class HeartbeatRequest   {
   private @Valid String nodeId = null;
   private @Valid Integer interval = null;
   private @Valid String mgtApiUrl = null;
+  private @Valid String signedChallenge = null;
 
   /**
    **/
@@ -123,6 +124,27 @@ public class HeartbeatRequest   {
     this.mgtApiUrl = mgtApiUrl;
   }
 
+  /**
+   * HMAC-SHA256 over the challenge together with groupId, nodeId and mgtApiUrl, keyed with the mi_super_admin
+   * password, base64-encoded. Absent on the first heartbeat for a new node; present on the follow-up heartbeat
+   * that answers the challenge ICP returned for that first attempt.
+   **/
+  public HeartbeatRequest signedChallenge(String signedChallenge) {
+    this.signedChallenge = signedChallenge;
+    return this;
+  }
+
+
+  @ApiModelProperty(value = "")
+  @JsonProperty("signedChallenge")
+
+  public String getSignedChallenge() {
+    return signedChallenge;
+  }
+  public void setSignedChallenge(String signedChallenge) {
+    this.signedChallenge = signedChallenge;
+  }
+
   @Override
   public boolean equals(java.lang.Object o) {
     if (this == o) {
@@ -136,12 +158,13 @@ public class HeartbeatRequest   {
            Objects.equals(groupId, heartbeatRequest.groupId) &&
            Objects.equals(nodeId, heartbeatRequest.nodeId) &&
            Objects.equals(interval, heartbeatRequest.interval) &&
-           Objects.equals(mgtApiUrl, heartbeatRequest.mgtApiUrl);
+           Objects.equals(mgtApiUrl, heartbeatRequest.mgtApiUrl) &&
+           Objects.equals(signedChallenge, heartbeatRequest.signedChallenge);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(product, groupId, nodeId, interval, mgtApiUrl);
+    return Objects.hash(product, groupId, nodeId, interval, mgtApiUrl, signedChallenge);
   }
 
   @Override
@@ -154,6 +177,7 @@ public class HeartbeatRequest   {
     sb.append("    nodeId: ").append(toIndentedString(nodeId)).append("\n");
     sb.append("    interval: ").append(toIndentedString(interval)).append("\n");
     sb.append("    mgtApiUrl: ").append(toIndentedString(mgtApiUrl)).append("\n");
+    sb.append("    signedChallenge: ").append(toIndentedString(signedChallenge)).append("\n");
     sb.append("}");
     return sb.toString();
   }

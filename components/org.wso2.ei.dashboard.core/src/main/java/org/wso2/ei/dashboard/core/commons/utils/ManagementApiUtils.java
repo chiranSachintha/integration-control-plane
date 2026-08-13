@@ -48,8 +48,16 @@ public class ManagementApiUtils {
 
     public static String getAccessToken(String mgtApiUrl) throws ManagementApiException {
         String username = System.getProperty("mi_username");
-        String password = System.getProperty("mi_password");
+        String password = getConfiguredPassword();
         return getToken(mgtApiUrl, username, password);
+    }
+
+    /**
+     * The shared mi_super_admin password ICP uses both to log in to managed MI nodes and, before that, to verify
+     * a new node's registration challenge. Never sent anywhere until the caller has proven it already holds it.
+     */
+    public static String getConfiguredPassword() {
+        return System.getProperty("mi_password");
     }
 
     public static String getToken(String mgtApiUrl, String username, String password) throws ManagementApiException {

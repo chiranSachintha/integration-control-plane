@@ -32,9 +32,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class Ack   {
   private @Valid String status = null;
   private @Valid String message = null;
+  private @Valid String challenge = null;
 
   public Ack(String status) {
     this.status = status;
+  }
+
+  public Ack(String status, String message) {
+    this.status = status;
+    this.message = message;
   }
 
   /**
@@ -73,6 +79,26 @@ public class Ack   {
     this.message = message;
   }
 
+  /**
+   * Set only when status is "challenge": a nonce the caller must sign with the shared mi_super_admin
+   * password and echo back (as signedChallenge) on the follow-up heartbeat.
+   **/
+  public Ack challenge(String challenge) {
+    this.challenge = challenge;
+    return this;
+  }
+
+
+  @ApiModelProperty(value = "")
+  @JsonProperty("challenge")
+
+  public String getChallenge() {
+    return challenge;
+  }
+  public void setChallenge(String challenge) {
+    this.challenge = challenge;
+  }
+
 
   @Override
   public boolean equals(java.lang.Object o) {
@@ -84,21 +110,23 @@ public class Ack   {
     }
     Ack ack = (Ack) o;
     return Objects.equals(status, ack.status) &&
-        Objects.equals(message, ack.message);
+        Objects.equals(message, ack.message) &&
+        Objects.equals(challenge, ack.challenge);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(status, message);
+    return Objects.hash(status, message, challenge);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class Ack {\n");
-    
+
     sb.append("    status: ").append(toIndentedString(status)).append("\n");
     sb.append("    message: ").append(toIndentedString(message)).append("\n");
+    sb.append("    challenge: ").append(toIndentedString(challenge)).append("\n");
     sb.append("}");
     return sb.toString();
   }

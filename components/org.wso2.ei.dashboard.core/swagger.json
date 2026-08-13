@@ -3827,6 +3827,10 @@
           },
           "mgtApiUrl" : {
             "type" : "string"
+          },
+          "signedChallenge" : {
+            "type" : "string",
+            "description" : "HMAC-SHA256 of the challenge together with groupId, nodeId and mgtApiUrl, keyed with the mi_super_admin password, base64-encoded. Omit on the first heartbeat for a new node; set on the follow-up heartbeat that answers the challenge returned for that attempt."
           }
         },
         "example" : {
@@ -3849,10 +3853,15 @@
         "type" : "object",
         "properties" : {
           "status" : {
-            "type" : "string"
+            "type" : "string",
+            "description" : "success, fail, or challenge. challenge is returned only for a heartbeat's first attempt to register a new node."
           },
           "message" : {
             "type" : "string"
+          },
+          "challenge" : {
+            "type" : "string",
+            "description" : "Present only when status is challenge: a nonce to sign with the mi_super_admin password and echo back as signedChallenge on the next heartbeat."
           }
         },
         "example" : {

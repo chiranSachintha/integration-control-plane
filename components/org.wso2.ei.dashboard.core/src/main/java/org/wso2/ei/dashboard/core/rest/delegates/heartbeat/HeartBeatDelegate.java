@@ -59,12 +59,27 @@ public class HeartBeatDelegate {
                 logger.debug("Management API URL received is: " + heartbeat.getMgtApiUrl());
             }
             boolean isSuccess;
-            String productName = heartbeat.getProduct();
-            ArtifactsManager artifactsManager = getArtifactManager(productName, heartbeat);
 
             if (isNodeRegistered(heartbeat)) {
                 isSuccess = updateHeartbeat(heartbeat);
             } else {
+                // heartbeat is unauthenticated, so mgtApiUrl and the mi_super_admin password must never be sent
+                // out on the caller's say-so alone - the caller must first prove it already holds that password.
+                String signedChallenge = heartbeatRequest.getSignedChallenge();
+                if (signedChallenge == null || signedChallenge.isEmpty()) {
+                    String challenge = NodeRegistrationChallengeManager.issueChallenge(
+                            heartbeat.getGroupId(), heartbeat.getNodeId());
+                    return new Ack(Constants.CHALLENGE_STATUS, "Sign the challenge with the mi_super_admin " +
+                            "password and resend the heartbeat with signedChallenge set.").challenge(challenge);
+                }
+                if (!NodeRegistrationChallengeManager.verify(
+                        heartbeat.getGroupId(), heartbeat.getNodeId(), heartbeat.getMgtApiUrl(), signedChallenge)) {
+                    logger.warn("Rejected node registration for node " + heartbeat.getNodeId() + " in group " +
+                            heartbeat.getGroupId() + ": challenge verification failed.");
+                    return new Ack(Constants.FAIL_STATUS, "Challenge verification failed.");
+                }
+                String productName = heartbeat.getProduct();
+                ArtifactsManager artifactsManager = getArtifactManager(productName, heartbeat);
                 isSuccess = registerNode(heartbeat, artifactsManager);
                 if (isSuccess) {
                     artifactsManager.runFetchAllExecutorService();
