@@ -151,16 +151,15 @@ public class OpaqueTokenSecurityHandler implements SecurityHandler {
             if (httpSc == HttpStatus.SC_OK) {
                 return HttpUtils.getJsonResponse(httpResponse).get(config.getAdminGroupAttribute());
             }
-            if (logger.isDebugEnabled()) {
-                logger.error("Error validating the token using userInfo endpoint. ",
-                        httpResponse.getStatusLine().getReasonPhrase());
-            }
-        } catch (IOException e) {
-            logger.error("Error validating the token using userInfo endpoint. ", e);
-        } catch (ManagementApiException e) {
-            throw new DashboardServerException("Error occurred while validating group membership. ", e);
+            String errorMessage = "UserInfo endpoint returned " + httpSc + ": "
+                    + httpResponse.getStatusLine().getReasonPhrase();
+            logger.error(errorMessage);
+            throw new TokenValidationException(errorMessage);
+        } catch (IOException | ManagementApiException e) {
+            logger.error("Unable to retrieve group membership from the UserInfo endpoint.", e);
+            throw new TokenValidationException(
+                    "Unable to retrieve group membership from the UserInfo endpoint", e);
         }
-        return null;
     }
 
     private String getUserInfoEndpointFromWellKnownEndpoint(String wellKnownEndpoint) {
