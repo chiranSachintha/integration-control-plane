@@ -48,10 +48,12 @@ import static org.wso2.ei.dashboard.core.commons.Constants.TOKEN_CACHE_TIMEOUT;
 public class OpaqueTokenSecurityHandler implements SecurityHandler {
 
     private static final Logger logger = LogManager.getLogger(OpaqueTokenSecurityHandler.class);
+    private static final long MAX_LOGIN_CLAIM_CACHE_SIZE = 10_000L;
     private static final Cache<String, Boolean> adminClaimMap =
             CacheBuilder.newBuilder().expireAfterWrite(TOKEN_CACHE_TIMEOUT, TimeUnit.MINUTES).build();
     private static final Cache<String, Boolean> loginClaimMap =
-            CacheBuilder.newBuilder().expireAfterWrite(TOKEN_CACHE_TIMEOUT, TimeUnit.MINUTES).build();
+            CacheBuilder.newBuilder().maximumSize(MAX_LOGIN_CLAIM_CACHE_SIZE)
+                    .expireAfterWrite(TOKEN_CACHE_TIMEOUT, TimeUnit.MINUTES).build();
     private static final Cache<String, String> subjectCache =
             CacheBuilder.newBuilder().expireAfterWrite(TOKEN_CACHE_TIMEOUT, TimeUnit.MINUTES).build();
     private static final AtomicBoolean PREFERRED_USERNAME_MISSING_WARNED = new AtomicBoolean(false);
@@ -155,7 +157,7 @@ public class OpaqueTokenSecurityHandler implements SecurityHandler {
                     + httpResponse.getStatusLine().getReasonPhrase();
             logger.error(errorMessage);
             throw new TokenValidationException(errorMessage);
-        } catch (IOException | ManagementApiException e) {
+        } catch (IOException | ManagementApiException | DashboardServerException e) {
             logger.error("Unable to retrieve group membership from the UserInfo endpoint.", e);
             throw new TokenValidationException(
                     "Unable to retrieve group membership from the UserInfo endpoint", e);
